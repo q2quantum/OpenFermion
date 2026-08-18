@@ -128,7 +128,36 @@ def optimize_orbitals(
         scipy.optimize.OptimizeResult. `result.x` is the optimal kappa
         parameter vector; `result.fun` is the optimized energy.
     """
+    if one_body_integrals.ndim != 2 or one_body_integrals.shape[0] != one_body_integrals.shape[1]:
+        raise ValueError(
+            f"one_body_integrals must be a square 2D array, got shape "
+            f"{one_body_integrals.shape}"
+        )
     n_orbitals = one_body_integrals.shape[0]
+    if two_body_integrals.shape != (n_orbitals,) * 4:
+        raise ValueError(
+            f"two_body_integrals must have shape {(n_orbitals,) * 4} to match "
+            f"one_body_integrals (n_orbitals={n_orbitals}), got "
+            f"{two_body_integrals.shape}"
+        )
+    n_spin_orbitals = 2 * n_orbitals
+    if one_rdm.shape != (n_spin_orbitals,) * 2:
+        raise ValueError(
+            f"one_rdm must have shape {(n_spin_orbitals,) * 2} (spin-orbital "
+            f"basis, 2 * n_orbitals with n_orbitals={n_orbitals}), got "
+            f"{one_rdm.shape}"
+        )
+    if two_rdm.shape != (n_spin_orbitals,) * 4:
+        raise ValueError(
+            f"two_rdm must have shape {(n_spin_orbitals,) * 4} (spin-orbital "
+            f"basis, 2 * n_orbitals with n_orbitals={n_orbitals}), got "
+            f"{two_rdm.shape}"
+        )
+    if n_electrons % 2 != 0:
+        raise ValueError(
+            f"optimize_orbitals is restricted (closed-shell) -- n_electrons "
+            f"must be even, got {n_electrons}"
+        )
     nocc = n_electrons // 2
     nvirt = n_orbitals - nocc
     if nocc <= 0 or nvirt <= 0:
@@ -159,6 +188,11 @@ def optimize_orbitals(
         init_params = np.zeros(nocc * nvirt)
     else:
         init_params = np.asarray(initial_guess).flatten()
+        if init_params.size != nocc * nvirt:
+            raise ValueError(
+                f"initial_guess has {init_params.size} parameters, expected "
+                f"nocc * nvirt = {nocc} * {nvirt} = {nocc * nvirt}"
+            )
 
     sp_optimizer_options = {'disp': verbose}
     if sp_options is not None:

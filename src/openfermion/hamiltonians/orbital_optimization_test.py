@@ -187,3 +187,57 @@ def test_optimize_orbitals_rejects_degenerate_orbital_split():
         optimize_orbitals(obi, tbi, one_rdm, two_rdm, n_electrons=4)  # all occupied, no virtuals
     with pytest.raises(ValueError):
         optimize_orbitals(obi, tbi, one_rdm, two_rdm, n_electrons=0)  # all virtual, no occupied
+
+
+def test_optimize_orbitals_rejects_mismatched_shapes():
+    """Gemini Code Assist review on PR #1442: no shape validation meant a
+    mismatched one_body_integrals/two_body_integrals/one_rdm/two_rdm/
+    n_electrons combination would fail deep inside energy() with a
+    confusing broadcast/index error instead of a clear message at the
+    call boundary."""
+    n_orbitals = 3
+    obi = np.zeros((n_orbitals, n_orbitals))
+    tbi = np.zeros((n_orbitals,) * 4)
+    one_rdm = np.zeros((2 * n_orbitals, 2 * n_orbitals))
+    two_rdm = np.zeros((2 * n_orbitals,) * 4)
+
+    with pytest.raises(ValueError, match="one_body_integrals"):
+        optimize_orbitals(np.zeros((n_orbitals, n_orbitals + 1)), tbi, one_rdm, two_rdm, 4)
+    with pytest.raises(ValueError, match="two_body_integrals"):
+        optimize_orbitals(obi, np.zeros((n_orbitals + 1,) * 4), one_rdm, two_rdm, 4)
+    with pytest.raises(ValueError, match="one_rdm"):
+        optimize_orbitals(obi, tbi, np.zeros((2 * n_orbitals + 1,) * 2), two_rdm, 4)
+    with pytest.raises(ValueError, match="two_rdm"):
+        optimize_orbitals(obi, tbi, one_rdm, np.zeros((2 * n_orbitals + 1,) * 4), 4)
+
+
+def test_optimize_orbitals_rejects_odd_electron_count():
+    """optimize_orbitals is restricted (closed-shell): n_electrons // 2
+    silently rounds an odd count down, which would optimize the wrong
+    number of occupied orbitals without any warning."""
+    n_orbitals = 3
+    obi = np.zeros((n_orbitals, n_orbitals))
+    tbi = np.zeros((n_orbitals,) * 4)
+    one_rdm = np.zeros((2 * n_orbitals, 2 * n_orbitals))
+    two_rdm = np.zeros((2 * n_orbitals,) * 4)
+    with pytest.raises(ValueError, match="even"):
+        optimize_orbitals(obi, tbi, one_rdm, two_rdm, n_electrons=3)
+
+
+def test_optimize_orbitals_rejects_mismatched_initial_guess():
+    """A caller-supplied initial_guess of the wrong length would otherwise
+    hit an IndexError deep inside rhf_params_to_matrix instead of a clear
+    message naming the expected parameter count."""
+    m = _load_h2()
+    hamiltonian = m.get_molecular_hamiltonian()
+    _, one_rdm, two_rdm = _fci_ground_state_rdms(hamiltonian, m.n_qubits)
+    with pytest.raises(ValueError, match="initial_guess"):
+        optimize_orbitals(
+            m.one_body_integrals,
+            m.two_body_integrals,
+            one_rdm,
+            two_rdm,
+            m.n_electrons,
+            initial_guess=np.zeros(5),  # wrong size for this molecule (H2/sto-3g needs 1)
+            verbose=False,
+        )
