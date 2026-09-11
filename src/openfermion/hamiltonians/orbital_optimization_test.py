@@ -14,11 +14,13 @@ from openfermion.ops.representations import general_basis_change
 
 
 def _fci_ground_state_rdms(hamiltonian, n_qubits):
-    """1-/2-RDM of the exact ground state, computed directly by expectation
-    value against the ground-state vector (not via a measured qubit
-    operator) -- the same construction `measurements.get_interaction_rdm`
-    uses, but starting from `linalg.get_ground_state` instead of a real
-    measurement, appropriate for a known-answer test."""
+    """1-/2-RDM of the exact ground state, computed directly from the state
+    vector.
+
+    Same construction `measurements.get_interaction_rdm` uses, but starting
+    from `linalg.get_ground_state` instead of a real measurement -- not via
+    a measured qubit operator, appropriate for a known-answer test.
+    """
     sparse_h = get_sparse_operator(hamiltonian, n_qubits=n_qubits)
     energy, state = get_ground_state(sparse_h)
 
@@ -44,12 +46,14 @@ def _load_h2(bond_length='0.7414', basis_suffix='sto-3g'):
 
 
 def test_optimize_orbitals_at_identity_reproduces_full_ci_energy():
-    """A necessary correctness check: with the RDM taken from a full
-    (untruncated) FCI calculation in the reference orbitals, evaluating the
-    objective at kappa=0 (the identity rotation) must reproduce the FCI
-    energy exactly -- this is just re-checking energy() is wired up to the
-    same accounting `InteractionRDM.expectation` uses, nothing about
-    optimization yet."""
+    """A necessary correctness check.
+
+    With the RDM taken from a full (untruncated) FCI calculation in the
+    reference orbitals, evaluating the objective at kappa=0 (the identity
+    rotation) must reproduce the FCI energy exactly -- this just re-checks
+    that energy() is wired up to the same accounting
+    `InteractionRDM.expectation` uses, nothing about optimization yet.
+    """
     m = _load_h2()
     hamiltonian = m.get_molecular_hamiltonian()
     fci_energy, one_rdm, two_rdm = _fci_ground_state_rdms(hamiltonian, m.n_qubits)
@@ -70,15 +74,17 @@ def test_optimize_orbitals_at_identity_reproduces_full_ci_energy():
 
 
 def test_full_space_fci_rdm_is_never_beaten_by_any_rotation():
-    """Physical correctness check, not a code-behavior tautology: when the
-    RDM comes from a full-space FCI calculation, no orbital rotation can
-    produce a state with LOWER energy than the FCI value, because a
-    rotation among all M orbitals stays inside the same complete
+    """Physical correctness check, not a code-behavior tautology.
+
+    When the RDM comes from a full-space FCI calculation, no orbital
+    rotation can produce a state with LOWER energy than the FCI value,
+    because a rotation among all M orbitals stays inside the same complete
     N-electron Fock space that full CI already minimizes over exactly.
     kappa=0 must therefore be a global minimum of energy(kappa) -- the
     optimizer, started away from kappa=0, must converge back down to (not
     below) the FCI energy, and any explicit nonzero kappa must score
-    >= the FCI energy."""
+    >= the FCI energy.
+    """
     m = _load_h2()
     hamiltonian = m.get_molecular_hamiltonian()
     fci_energy, one_rdm, two_rdm = _fci_ground_state_rdms(hamiltonian, m.n_qubits)
@@ -123,11 +129,13 @@ def test_full_space_fci_rdm_is_never_beaten_by_any_rotation():
 
 
 def test_optimize_orbitals_improves_a_truncated_active_space():
-    """The realistic use case: a CASCI-style active-space-truncated RDM
-    (computed via canonical/reference orbitals, which are not generally
-    CASSCF-optimal) should either be improved by orbital rotation or, at
-    worst, left unchanged -- never made worse than the untruncated
-    (kappa=0) starting point."""
+    """The realistic use case.
+
+    A CASCI-style active-space-truncated RDM (computed via canonical/
+    reference orbitals, which are not generally CASSCF-optimal) should
+    either be improved by orbital rotation or, at worst, left unchanged --
+    never made worse than the untruncated (kappa=0) starting point.
+    """
     m = _load_h2(bond_length='0.75', basis_suffix='6-31g')
     # 4 spatial orbitals total; restrict the active CI space to the lowest 2
     # (drop the top 2 virtuals from the CI problem, but keep them in the
@@ -190,11 +198,13 @@ def test_optimize_orbitals_rejects_degenerate_orbital_split():
 
 
 def test_optimize_orbitals_rejects_mismatched_shapes():
-    """Gemini Code Assist review on PR #1442: no shape validation meant a
-    mismatched one_body_integrals/two_body_integrals/one_rdm/two_rdm/
+    """No shape validation caught early (found by automated code review).
+
+    A mismatched one_body_integrals/two_body_integrals/one_rdm/two_rdm/
     n_electrons combination would fail deep inside energy() with a
     confusing broadcast/index error instead of a clear message at the
-    call boundary."""
+    call boundary.
+    """
     n_orbitals = 3
     obi = np.zeros((n_orbitals, n_orbitals))
     tbi = np.zeros((n_orbitals,) * 4)
@@ -212,9 +222,11 @@ def test_optimize_orbitals_rejects_mismatched_shapes():
 
 
 def test_optimize_orbitals_rejects_odd_electron_count():
-    """optimize_orbitals is restricted (closed-shell): n_electrons // 2
-    silently rounds an odd count down, which would optimize the wrong
-    number of occupied orbitals without any warning."""
+    """optimize_orbitals is restricted (closed-shell).
+
+    n_electrons // 2 silently rounds an odd count down, which would
+    optimize the wrong number of occupied orbitals without any warning.
+    """
     n_orbitals = 3
     obi = np.zeros((n_orbitals, n_orbitals))
     tbi = np.zeros((n_orbitals,) * 4)
@@ -225,9 +237,11 @@ def test_optimize_orbitals_rejects_odd_electron_count():
 
 
 def test_optimize_orbitals_rejects_mismatched_initial_guess():
-    """A caller-supplied initial_guess of the wrong length would otherwise
-    hit an IndexError deep inside rhf_params_to_matrix instead of a clear
-    message naming the expected parameter count."""
+    """A caller-supplied initial_guess of the wrong length.
+
+    Would otherwise hit an IndexError deep inside rhf_params_to_matrix
+    instead of a clear message naming the expected parameter count.
+    """
     m = _load_h2()
     hamiltonian = m.get_molecular_hamiltonian()
     _, one_rdm, two_rdm = _fci_ground_state_rdms(hamiltonian, m.n_qubits)
